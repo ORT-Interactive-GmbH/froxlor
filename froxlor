@@ -86,7 +86,7 @@ $app->command('domains:add repository', function ($repository, InputInterface $i
     function cloneRepository($host, $repository, $login, $folder, $output) {
         $output->writeln('<info>Installing repository in directory "'.$folder.'".</info>');
         try {
-            $process = new Process(__DIR__.'/vendor/bin/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host);
+            $process = new Process(__DIR__.'/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host);
             $process->mustRun();
             $output->writeln($process->getOutput());
         } catch( ProcessFailedException $e) {
