@@ -2,7 +2,7 @@
 
 ## Usage
 
-`composer require global ortinteractive/froxlor`
+`composer global require ortinteractive/froxlor`
 
 Set login credentials:
 
