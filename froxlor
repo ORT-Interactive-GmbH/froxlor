@@ -1,8 +1,10 @@
 #!/usr/bin/env php
 <?php
 if (is_dir(__DIR__.'/vendor/')) {
+    $cwd = __DIR__;
     require __DIR__.'/vendor/autoload.php';
 } else {
+    $cwd = __DIR__.'/../ortinteractive/froxlor/';
     require __DIR__.'/../../autoload.php';
 }
 
@@ -80,13 +82,13 @@ $app->command('domains:find name', function ($name, OutputInterface $output) use
 });
 
 
-$app->command('domains:add repository', function ($repository, InputInterface $input, OutputInterface $output) use ($froxlor, $config) {
+$app->command('domains:add repository', function ($repository, InputInterface $input, OutputInterface $output) use ($froxlor, $config, $cwd) {
     $host = $config->host;
 
-    function cloneRepository($host, $repository, $login, $folder, $output) {
+    function cloneRepository($cwd, $host, $repository, $login, $folder, $output) {
         $output->writeln('<info>Installing repository in directory "'.$folder.'".</info>');
         try {
-            $process = new Process(__DIR__.'/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host);
+            $process = new Process(__DIR__.'/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host, $cwd);
             $process->mustRun();
             $output->writeln($process->getOutput());
         } catch( ProcessFailedException $e) {
@@ -98,7 +100,7 @@ $app->command('domains:add repository', function ($repository, InputInterface $i
     $domain = $config->ssh_login.'.'.$repository.'.ort-dev.de';
     if (!$froxlor->hasDomain($domain)) {
         $output->writeln('<info>Creating domain '.$domain.'...');
-        cloneRepository($host, $repository, $config->ssh_login, $config->ssh_login, $output);
+        cloneRepository($cwd, $host, $repository, $config->ssh_login, $config->ssh_login, $output);
         $froxlor->createDomain($repository, $config->ssh_login, 'public');
         $output->writeln('<info>Successfully created domain http://'.$domain);
     } else {
@@ -109,7 +111,7 @@ $app->command('domains:add repository', function ($repository, InputInterface $i
     $domain = 'test.'.$repository.'.ort-dev.de';
     if (!$froxlor->hasDomain($domain)) {
         $output->writeln('<info>Creating domain '.$domain.'...');
-        cloneRepository($host, $repository, $config->ssh_login, 'test', $output);
+        cloneRepository($cwd, $host, $repository, $config->ssh_login, 'test', $output);
         $froxlor->createDomain($repository, 'test', 'public');
         $output->writeln('<info>Successfully created domain http://'.$domain);
     } else {
@@ -120,7 +122,7 @@ $app->command('domains:add repository', function ($repository, InputInterface $i
     $domain = 'dev.'.$repository.'.ort-dev.de';
     if (!$froxlor->hasDomain($domain)) {
         $output->writeln('<info>Creating domain '.$domain.'...');
-        cloneRepository($host, $repository, $config->ssh_login, 'dev', $output);
+        cloneRepository($cwd, $host, $repository, $config->ssh_login, 'dev', $output);
         $froxlor->createDomain($repository, 'dev', 'public');
         $output->writeln('<info>Successfully created domain http://'.$domain);
     } else {
