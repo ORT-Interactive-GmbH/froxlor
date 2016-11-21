@@ -10,8 +10,10 @@ Set login credentials:
 
 Set config values:
 
-`froxlor config:set ssh_login YOURUSERNAME`
-`froxlor config:set host SSH_SERVER`
+```bash
+froxlor config:set ssh_login YOURUSERNAME
+froxlor config:set host SSH_SERVER
+```
 
 ## License
 
