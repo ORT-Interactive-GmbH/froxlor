@@ -1,0 +1,142 @@
+#!/usr/bin/env php
+<?php
+require __DIR__.'/vendor/autoload.php';
+
+use ORTInteractive\Froxlor\Froxlor;
+use Silly\Application;
+use Symfony\Component\Console\Helper\Table;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
+
+$version = '0.1.0';
+$app = new Application('Froxlor', $version);
+
+define('FROXLOR_HOME_PATH', posix_getpwuid(fileowner(__FILE__))['dir'].'/.froxlor');
+$configFile = FROXLOR_HOME_PATH.'/config.json';
+if (!is_dir(FROXLOR_HOME_PATH)) {
+    mkdir(FROXLOR_HOME_PATH);
+    file_put_contents($configFile, json_encode([
+        'host' => '',
+        'baseUrl' => '',
+        'username' => '',
+        'password' => '',
+        'folder_name' => '',
+        'ssh_login' => ''
+    ], JSON_PRETTY_PRINT));
+}
+$config = json_decode(file_get_contents(FROXLOR_HOME_PATH.'/config.json'));
+
+$froxlor = new Froxlor($config->baseUrl, $config->username, $config->password);
+
+$app->command('login baseUrl username password', function ($baseUrl, $username, $password, OutputInterface $output) use ($configFile) {
+    file_put_contents($configFile, json_encode([
+        'baseUrl' => $baseUrl,
+        'username' => $username,
+        'password' => $password
+    ], JSON_PRETTY_PRINT));
+
+    $output->writeln('<info>Email and Password successfully set.</info>');
+});
+
+$app->command('config:set key value', function ($key, $value, OutputInterface $output) use ($froxlor, $configFile, $config) {
+    $config->{$key} = $value;
+    file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT));
+    $output->writeln('<info>Successfully set config key '.$key.'</info>');
+});
+
+$app->command('config:get key', function ($key, OutputInterface $output) use ($froxlor, $configFile, $config) {
+    $output->writeln('<info>Config value for "'.$key.'" is: '.$config->{$key}.'</info>');
+});
+
+$app->command('domains:list', function (OutputInterface $output) use ($froxlor) {
+    $domains = $froxlor->getDomains();
+
+    $table = new Table($output);
+    $table->setHeaders(['Domain', 'Path']);
+    $domains->each(function ($domain) use ($table) {
+        $table->addRow([$domain['domain'], $domain['path']]);
+    });
+    $table->render();
+});
+
+$app->command('domains:find name', function ($name, OutputInterface $output) use ($froxlor) {
+    $domains = $froxlor->getDomains()->filter(function($domain) use ($name) {
+        return stristr($domain['domain'], $name);
+    });
+
+    $table = new Table($output);
+    $table->setHeaders(['Domain', 'Path']);
+    $domains->each(function ($domain) use ($table) {
+        $table->addRow([$domain['domain'], $domain['path']]);
+    });
+    $table->render();
+});
+
+
+$app->command('domains:add repository', function ($repository, InputInterface $input, OutputInterface $output) use ($froxlor, $config) {
+    $host = $config->host;
+
+    function cloneRepository($host, $repository, $login, $folder, $output) {
+        $output->writeln('<info>Installing repository in directory "'.$folder.'".</info>');
+        try {
+            $process = new Process(__DIR__.'/vendor/bin/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host);
+            $process->mustRun();
+            $output->writeln($process->getOutput());
+        } catch( ProcessFailedException $e) {
+            $output->writeln('<error>Unable to clone repository in user directory</error>');
+            $output->writeln('<error>'.$e->getProcess()->getOutput().'</error>');
+        }
+    }
+    // Login via SSH and clone repository (user dir)
+    $domain = $config->ssh_login.'.'.$repository.'.ort-dev.de';
+    if (!$froxlor->hasDomain($domain)) {
+        $output->writeln('<info>Creating domain '.$domain.'...');
+        cloneRepository($host, $repository, $config->ssh_login, $config->ssh_login, $output);
+        $froxlor->createDomain($repository, $config->ssh_login, 'public');
+        $output->writeln('<info>Successfully created domain http://'.$domain);
+    } else {
+        $output->writeln('<info>Domain '.$domain.' already exists. Skipping.');
+    }
+
+    // Login via SSH and clone repository test
+    $domain = 'test.'.$repository.'.ort-dev.de';
+    if (!$froxlor->hasDomain($domain)) {
+        $output->writeln('<info>Creating domain '.$domain.'...');
+        cloneRepository($host, $repository, $config->ssh_login, 'test', $output);
+        $froxlor->createDomain($repository, 'test', 'public');
+        $output->writeln('<info>Successfully created domain http://'.$domain);
+    } else {
+        $output->writeln('<info>Domain '.$domain.' already exists. Skipping.');
+    }
+
+    // Login via SSH and clone repository dev
+    $domain = 'dev.'.$repository.'.ort-dev.de';
+    if (!$froxlor->hasDomain($domain)) {
+        $output->writeln('<info>Creating domain '.$domain.'...');
+        cloneRepository($host, $repository, $config->ssh_login, 'dev', $output);
+        $froxlor->createDomain($repository, 'dev', 'public');
+        $output->writeln('<info>Successfully created domain http://'.$domain);
+    } else {
+        $output->writeln('<info>Domain '.$domain.' already exists. Skipping.');
+    }
+
+    // Ask for databases
+    $helper = $this->getHelperSet()->get('question');
+
+    $question = new ConfirmationQuestion('Do you need a database?', false);
+
+    if ($helper->ask($input, $output, $question)) {
+        $credentials = $froxlor->createDatabase($repository);
+        $output->writeln('Successfully created database.');
+        $output->writeln('Database/User: '.$credentials['username']);
+        $output->writeln('Password: '.$credentials['password']);
+    }
+});
+
+/**
+ * Run the application.
+ */
+$app->run();
