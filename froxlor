@@ -4,7 +4,7 @@ if (is_dir(__DIR__.'/vendor/')) {
     $cwd = __DIR__;
     require __DIR__.'/vendor/autoload.php';
 } else {
-    $cwd = __DIR__.'/../ortinteractive/froxlor/';
+    $cwd = __DIR__;
     require __DIR__.'/../../autoload.php';
 }
 
@@ -88,7 +88,7 @@ $app->command('domains:add repository', function ($repository, InputInterface $i
     function cloneRepository($cwd, $host, $repository, $login, $folder, $output) {
         $output->writeln('<info>Installing repository in directory "'.$folder.'".</info>');
         try {
-            $process = new Process(__DIR__.'/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host, $cwd);
+            $process = new Process(__DIR__.'/../../bin/envoy run install -vvv -n --repo='.$repository.' --folder='.$folder.' --user='.$login.' --host='.$host, $cwd);
             $process->mustRun();
             $output->writeln($process->getOutput());
         } catch( ProcessFailedException $e) {
